@@ -28,7 +28,13 @@ export class Login {
   registroErrorMsg = '';
   registroErrorColor = '';
 
+  // Activa validación visual tras intentar registrarse
+  regValidationActive = false;
+
   loginSuccessMsg = '';
+
+  passwordVisible = false;      // para login
+  regPasswordVisible = false;   // para registro
 
   constructor(private auth: AuthService, private cdr: ChangeDetectorRef, private router: Router, private route: ActivatedRoute) { }
 
@@ -54,16 +60,72 @@ export class Login {
     });
   }
 
+  
+  // devuelve estado de cada requisito (para la vista)
+  public requisitosContrasena(password: string) {
+    return [
+      { key: 'length', valid: password?.length >= 8, msg: 'mínimo 8 caracteres' },
+      { key: 'upper', valid: /[A-Z]/.test(password || ''), msg: 'al menos una letra mayúscula' },
+      { key: 'lower', valid: /[a-z]/.test(password || ''), msg: 'al menos una letra minúscula' },
+      { key: 'digit', valid: /[0-9]/.test(password || ''), msg: 'al menos un número' },
+      { key: 'special', valid: /[!@#\$%\^&\*\(\)\-\_\=\+\[\]\{\};:'",<\.>\/\?\\|`~\.#]/.test(password || ''), msg: 'al menos un carácter especial (ej: ., #, !, @)' },
+      { key: 'nospace', valid: !/\s/.test(password || ''), msg: 'sin espacios' },
+    ];
+  }
+
+  tieneRequisitosIncompletos(password: string): boolean {
+    return this.requisitosContrasena(password).some(r => !r.valid);
+  }
+
+  validarContrasena(password: string): string[] {
+    return this.requisitosContrasena(password).filter(r => !r.valid).map(r => r.msg);
+  }
+
+  formatodeContrasena(missing: string[]): string {
+    if (!missing.length) return '';
+    if (missing.length === 1) return `La contraseña debe contener ${missing[0]}.`;
+    const last = missing.pop();
+    return `La contraseña debe contener ${missing.join(', ')} y ${last}.`;
+  }
+
+  // alterna visibilidad del input de login
+  public toggleContrasenaVisible() {
+    this.passwordVisible = !this.passwordVisible;
+  }
+
+  // alterna visibilidad del input de registro
+  public toggleRegContrasenaVisible() {
+    this.regPasswordVisible = !this.regPasswordVisible;
+  }
+
+
   onRegister() {
+    this.registroErrorMsg = '';
+    this.registroErrorColor = '';
+    this.regValidationActive = false; // NO mostrar sugerencias aún
+
+    // 1) Comprobar campos vacíos
     if (!this.regUsername || !this.regEmail || !this.regPassword) {
       this.registroErrorMsg = 'Por favor, complete todos los campos.';
-      this.registroErrorColor = '#148974';
+      this.registroErrorColor = '#e74c3c';
+      this.cdr.detectChanges();
       return;
     }
 
+    // 2) Validación de contraseña en cliente (prioritaria antes de enviar al servidor)
+    const missing = this.validarContrasena(this.regPassword);
+    if (missing.length) {
+      this.regValidationActive = true;
+      this.registroErrorColor = '#e74c3c';
+      this.cdr.detectChanges();
+      return;
+    }
+
+    // 3) Enviar petición de registro al servidor (ahora la contraseña ya es válida)
     this.auth.register(this.regUsername, this.regEmail, this.regPassword).subscribe({
       next: (res) => {
-        // Cierra el modal de registro y abre el de éxito
+        // Registro exitoso: limpiar estados y mostrar modal de éxito
+        this.regValidationActive = false;
         const registroModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('registroModal'));
         registroModal.hide();
         const exitoModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('registroExitosoModal'));
@@ -75,7 +137,18 @@ export class Login {
         this.registroErrorMsg = '';
       },
       error: (err) => {
-        this.registroErrorMsg = err?.error?.msg || 'Error desconocido en el registro.';
+        const serverMsg = err?.error?.msg || err?.message || '';
+
+        // Si el servidor indica usuario o correo duplicado, mostrar ese mensaje
+        if (/usuario.*registrad|user.*exists|username.*exists|correo.*registrad|email.*exists|already.*exists/i.test(serverMsg)) {
+          this.registroErrorMsg = serverMsg || 'Usuario o correo ya registrado.';
+          this.registroErrorColor = '#e74c3c';
+          this.cdr.detectChanges();
+          return;
+        }
+
+        // Fallback: mostrar mensaje del servidor si no encaja en los anteriores
+        this.registroErrorMsg = serverMsg || 'Error desconocido en el registro.';
         this.registroErrorColor = '#e74c3c';
         this.cdr.detectChanges();
       }
@@ -83,8 +156,9 @@ export class Login {
   }
 
   abrirRegistroModal() {
-    // Limpia el mensaje solo al abrir el modal, no los campos
     this.registroErrorMsg = '';
+    this.registroErrorColor = '';
+    this.regValidationActive = false;
   }
 
   cerrarModales() {
@@ -94,15 +168,35 @@ export class Login {
     registroModal.hide();
   }
 
+  // ...existing code...
   ngOnInit() {
     this.route.queryParams.subscribe(params => {
       if (params['logout']) {
         this.loginSuccessMsg = 'Sesión cerrada correctamente';
         this.loginErrorMsg = '';
         this.loginErrorColor = '';
-        setTimeout(() => this.loginSuccessMsg = '', 2500); // Oculta el mensaje tras 4s
+        setTimeout(() => this.loginSuccessMsg = '', 2500);
       }
     });
+
+    
+    if (typeof document !== 'undefined') {
+      const registroEl = document.getElementById('registroModal');
+      if (registroEl) {
+        registroEl.addEventListener('hidden.bs.modal', () => {
+          this.regUsername = '';
+          this.regEmail = '';
+          this.regPassword = '';
+          this.registroErrorMsg = '';
+          this.registroErrorColor = '';
+          this.regValidationActive = false;
+          this.regPasswordVisible = false;
+          this.cdr.detectChanges();
+        });
+      }
+    }
   }
 }
+
+
 

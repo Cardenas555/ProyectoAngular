@@ -14,11 +14,11 @@
                 </div>
                 <div class="mb-3">
                     <div class="input-group">
-                        <input type="password" class="form-control" placeholder="Contraseña" [(ngModel)]="password"
+                        <input [type]="passwordVisible ? 'text' : 'password'" class="form-control" placeholder="Contraseña" [(ngModel)]="password"
                             name="password" required />
-                        <span class="input-group-text bg-white border-start-0">
-                            <i class="bi bi-lock"></i>
-                        </span>
+                        <button type="button" class="input-group-text bg-white border-start-0" (click)="toggleContrasenaVisible()" aria-label="Mostrar/ocultar contraseña">
+                            <i class="bi" [ngClass]="passwordVisible ? 'bi-eye-fill' : 'bi-eye-slash-fill'"></i>
+                        </button>
                     </div>
                 </div>
                 <div class="mb-3">
@@ -69,23 +69,39 @@
                         </div>
 
                         <div class="input-group mb-2">
-                            <input type="password" class="form-control" placeholder="Contraseña"
+                            <input [type]="regPasswordVisible ? 'text' : 'password'" class="form-control" placeholder="Contraseña"
                                 [(ngModel)]="regPassword" name="regPassword" required />
-                            <span class="input-group-text bg-white border-start-0">
-                                <i class="bi bi-lock"></i>
-                            </span>
+                            <button type="button" class="input-group-text bg-white border-start-0" (click)="toggleRegContrasenaVisible()" aria-label="Mostrar/ocultar contraseña">
+                                <i class="bi" [ngClass]="regPasswordVisible ? 'bi-eye-fill' : 'bi-eye-slash-fill'"></i>
+                            </button>
+                        </div>
+
+                        <div class="mt-1">
+                            <!-- muestra solo después de intentar registrar y si hay requisitos incumplidos -->
+                            <div *ngIf="regValidationActive && tieneRequisitosIncompletos(regPassword)">
+                                <div class="small fw-bold mb-1">La contraseña debe tener:</div>
+                                <ul class="list-unstyled small mb-0">
+                                    <li *ngFor="let req of requisitosContrasena(regPassword)"
+                                        [style.color]="req.valid ? '#1A9440' : (registroErrorColor || '#e74c3c')">
+                                        <i class="bi"
+                                            [ngClass]="req.valid ? 'bi-check-circle-fill' : 'bi-x-circle-fill'"
+                                            style="margin-right:6px"></i>
+                                        {{ req.msg }}
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
 
                         <!-- Contenedor del mensaje de error DEBAJO de los inputs.
          Se mantiene siempre en el DOM y solo se oculta con d-none -->
                         <div class="mt-2" style="min-height: 1rem;">
-                            <div role="alert" aria-live="assertive" class="text-center small"
+                            <div role="alert" aria-live="assertive" class="text-center small py-2"
                                 [style.color]="registroErrorColor" [class.d-none]="!registroErrorMsg">
                                 {{ registroErrorMsg }}
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer" style="margin-top: -25px;">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                         <button type="submit" class="btn btn-c">Registrarse</button>
                     </div>
